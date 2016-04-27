@@ -1,0 +1,670 @@
+<!--页面逻辑
+1.通过index中查询按钮将药名、经纬度、所在省份、城市、传给后台php
+2.后台通过药名将查询结果以json形式返回
+3.将json动态生成list
+4.点击list传递详细参数给detail、并跳转显示
+
+-->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8">
+    <title>药品价格查询</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="css/jquery.mobile-1.4.5.min.css"/>
+
+    <script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=F8393b5f8813fddd1310521fe110d075"></script>
+    <style type="text/css">
+        #mapMap{height:300px;width:100%;}
+        #mapResult,#mapResult table{width:100%;}
+        .yangshi_cu{font-weight:bold}
+    </style>
+<script>
+$(document).bind("mobileinit",function(){
+    $.mobile.loadingMessage="加载中···";	
+    });
+</script>
+<script src="js/jquery-1.11.1.js" type="text/javascript"></script>
+<script src="js/jquery.mobile-1.4.5.min.js" type="text/javascript"></script>											
+<script>
+var _province=0;  //定位省
+var _city=0;        //定位城市
+var _weiDu=0;      
+var _jingDu=0;
+var yd_weiDu=0;
+var yd_jingDu=0;
+var _isbind = 0;
+var _iscity = 0;
+var _sequence = 1;  //排序类型   1为价格  2为距离
+var vas="";
+var http="http://192.168.1.107:8880/ajaxdemo/";			
+														
+//点击查询按钮 执行获取最初表单
+/*-------------------------------------------*/
+function getList(){
+    //var vas="";
+    $("#indexMoreBut").hide();//隐藏加载更多按钮
+    setTimeout(function(){  
+        $.mobile.loading('show');  
+    },1);  //显示加载按钮
+    $("#indexSearchBut").attr("disabled",true);//当前按钮不可用
+    $("#indexDataList").html("");//清空list中内容
+    if($("#indexKeyword").val()){
+
+         var data = {"key":$("#indexKeyword").val(),"province":_province,"city":_city,"sequence":_sequence,"weiDu":_weiDu,"jingDu":_jingDu};
+         $.getJSON(http+"DBlist.php",data,function(_vas){
+        //如果调用php成功
+         if(_vas)
+         {
+             vas=_vas;
+             showList();
+             }
+         else{
+            $("#indexDataList").html("");//清空list中内容
+            alert("无查询结果");
+            setTimeout(function(){  
+                $.mobile.loading('hide');  
+            },1);  //隐藏加载
+            $("#indexSearchBut").attr("disabled",false); //恢复按钮点击
+            return; 
+             }
+
+         });
+            
+         
+         }
+        else{
+            alert ("请输入查询药品名称！");
+            setTimeout(function(){  
+                $.mobile.loading('hide');  
+            },1);  //隐藏加载
+            $("#indexSearchBut").attr("disabled",false); //恢复按钮点击
+            return;
+            } 	
+    };
+   //显示查询结果
+ /*-------------------------------------------*/
+function showList(){
+    
+    var list = $("#indexDataList"); //获取list
+    var arr = [];
+    var show_num = $("#indexDataList li").length;//获取indexDataList中li的个数
+    if(show_num==vas.length)
+    {
+        alert("无更多数据！");
+        return ;
+        }	
+	var num=(vas.length-show_num>9)?(show_num+9):(vas.length-1);
+	for(var o=show_num;o<=num;o++)
+	{
+        //alert("次数"+o);
+         arr.push('<li><a href="#detail" data-transition="slideup" data-no="' + o + '"data-ydm="' + vas[o].ydm+ '"data-yddz="' + vas[o].yddz +'"data-yddh="' + vas[o].yddh + '"data-ypm="' + vas[o].ypm + '"data-ypcs="' + vas[o].ypcs + '"data-ypgg="' + vas[o].ypgg + '"data-ypjx="' + vas[o].ypjx + '"data-ypbz="' + vas[o].ypbz +'"data-ypdj_u="' + vas[o].ypdj_u +'"data-ypdj_d="' + vas[o].ypdj_d +'"data-juli="' + vas[o].juli +  '"data-ydjd="' + vas[o].ydjd + '"data-ydwd="' + vas[o].ydwd + '">' + '<h2>药店名：' + vas[o].ydm + '</h2><p>药品名：' + vas[o].ypm + '</p><p>产商：' + vas[o].ypcs + '</p><p>距离：'+ vas[o].juli + '</p>' + '<p class="ui-li-aside">单价：' + vas[o].ypdj_u + "~" + vas[o].ypdj_d + '</p>' + '</a></li>');
+        }
+
+
+    list.append(arr.join(""));//join() 方法用于把数组中的所有元素放入一个字符串
+    list.listview("refresh");//list动态加载后执行，否则不会以列表形式显
+    
+    setTimeout(function(){  
+        $.mobile.loading('hide');  
+    },1);  //隐藏加载
+    $("#indexSearchBut").attr("disabled",false); //恢复按钮点击
+    $("#indexMoreBut").show();//显示加载更多按钮	 
+    //alert("vas.length="+vas.length+"**show_num="+show_num);
+            }
+    
+     //获取详细资料
+/*-------------------------------------------*/
+var isAjax = false;
+function getDetail(){
+    
+    if(isAjax) return;
+    isAjax = true; //防止list被多次点击
+    
+    $.mobile.loading("show");
+    var number = $(this).attr("data-no");
+    var ydm = $(this).attr("data-ydm");
+    var yddz = $(this).attr("data-yddz");
+    var yddh = $(this).attr("data-yddh");
+    var ypm = $(this).attr("data-ypm");
+    var ypcs = $(this).attr("data-ypcs");
+    var ypgg = $(this).attr("data-ypgg");
+    var ypjx = $(this).attr("data-ypjx");
+    var ypbz = $(this).attr("data-ypbz");
+    var ypdj_u = $(this).attr("data-ypdj_u");
+    var ypdj_d = $(this).attr("data-ypdj_d");
+    var juli = $(this).attr("data-juli");
+    yd_jingDu = $(this).attr("data-ydjd");
+    yd_weiDu = $(this).attr("data-ydwd");
+    $("#detail").find(".ui-content h2").html(ydm);//页面id为detail中class为ui-contenh2标签输出ydm 若有多个h2可在.html前加入first()
+    
+    //跳转map
+    _mapKey=ydm.concat(yddz);//合并
+    _h3Map='<a href="#map" data-transition="slideup">' + "点击跳转地图页面" + '</a>';
+    $("#detail").find(".ui-content h3").html(_h3Map);
+    //显示table表头
+    
+    
+    //var grid =$("#detail").find(".ui-content div");
+    var grid =$("#detail").find(".ui-content div").first();
+    grid.html("");
+        var grid_data='<div class="ui-block-a"><span class="yangshi_cu">'+"药店地址"+'</span></div><div class="ui-block-b"><span>'+ yddz +'</span></div><div class="ui-block-a"><span class="yangshi_cu">'+"药店电话"+'</span></div><div class="ui-block-b"><span>'+ yddh +'</span></div><div class="ui-block-a"><span class="yangshi_cu">'+"药品名"+'</span></div><div class="ui-block-b"><span>'+ ypm +'</span></div><div class="ui-block-a"><span class="yangshi_cu">'+"药品厂商"+'</span></div><div class="ui-block-b"><span>'+ ypcs +'</span></div><div class="ui-block-a"><span class="yangshi_cu">'+"药品规格"+'</span></div><div class="ui-block-b"><span>'+ ypgg +'</span></div><div class="ui-block-a"><span class="yangshi_cu">'+"药品剂型"+'</span></div><div class="ui-block-b"><span>'+ ypjx +'</span></div><div class="ui-block-a"><span class="yangshi_cu">药品包装</span></div><div class="ui-block-b"><span>'+ ypbz +'</span></div><div class="ui-block-a"><span class="yangshi_cu">'+"药品单价"+'</span></div><div class="ui-block-b"><span>'+ ypdj_u+"~"+ypdj_d +'</span></div><div class="ui-block-a"><span class="yangshi_cu">'+"药店距离"+'</span></div><div class="ui-block-b"><span>'+ juli +'</span></div>';
+    grid.append(grid_data);	
+    $.mobile.loading("hide");
+    isAjax=false;
+    $.mobile.changePage("#detail");
+    };
+	
+   //获取城市
+/*-------------------------------------------*/
+function getCity(){
+    _city=$(this).attr("c");
+     $("#index").find("#indexCity").html(_city);
+	 localStorage.setItem("city",_city);
+    }
+	
+      //定位事件
+/*-------------------------------------------*/
+function get_addressInfo(){
+    var geolocation = new BMap.Geolocation();
+        geolocation.getCurrentPosition(function(r){
+        if(this.getStatus() == BMAP_STATUS_SUCCESS){
+        var mk = new BMap.Marker(r.point);
+        var myGeo = new BMap.Geocoder();
+        myGeo.getLocation(new BMap.Point(r.point.lng,r.point.lat), function(rs){
+         // console.log(MyApp.app.mapCenter);
+          console.log(rs);
+          var addComp = rs.addressComponents;
+          //alert(addComp.province + addComp.city + addComp.district + addComp.street + addComp.streetNumber);
+          
+                                                                                     //全局变量省份和城市
+          _province=addComp.province;
+          i_city=addComp.city;
+          
+          //alert("经度："+r.point.lng+"纬度："+r.point.lat);
+          _weiDu=r.point.lat;
+          _jingDu=r.point.lng;
+		  if(_city==0||_city==i_city){
+			  $("#index").find("#indexCity").html(i_city);
+			   localStorage.setItem("city",i_city);
+			  }
+		  else if(i_city!=_city&&_city!=0){
+			  alert("上次定位为"+_city+"，此时您在"+i_city+"。以更改到当前位置");
+			  _city=i_city;
+			  //最初修改index页面的地址显示
+			  $("#index").find("#indexCity").html(_city);
+			  localStorage.setItem("city",_city);
+			  }  
+      });       
+        }
+        else {
+            alert('未知地址（'+this.getStatus() + '）');
+        }
+    });
+    }
+    
+ //map页面函数  选择路程
+/*-------------------------------------------*/
+function change(value){
+    if(value=="walking"){
+        walking();
+        }
+    else if(value=="driving"){
+        driving();
+    }
+    else{
+        bus();
+        }
+    }
+													  
+//步行路程
+/*-------------------------------------------*/
+function walking(){	
+    var map = new BMap.Map("mapMap");
+    map.centerAndZoom(new BMap.Point(_jingDu,_weiDu), 11);
+    map.enableScrollWheelZoom(true);     //开启鼠标滚轮缩放
+    var walking = new BMap.WalkingRoute(map, {renderOptions: {map: map, panel: "mapResult", autoViewport: true}});
+    map.enableScrollWheelZoom(true);     //开启鼠标滚轮缩放
+    var point1 = new BMap.Point(_jingDu,_weiDu);
+    var point2 = new BMap.Point(yd_jingDu,yd_weiDu);
+    walking.search(point1, point2)
+}
+
+   //驾车路程
+ /*-------------------------------------------*/
+function driving(){
+    var map = new BMap.Map("mapMap");
+    map.centerAndZoom(new BMap.Point(_jingDu,_weiDu), 12);
+
+    var driving = new BMap.DrivingRoute(map, {renderOptions: {map: map, panel: "mapResult", autoViewport: true}});
+    map.enableScrollWheelZoom(true);     //开启鼠标滚轮缩放
+    var point1 = new BMap.Point(_jingDu,_weiDu);
+    var point2 = new BMap.Point(yd_jingDu,yd_weiDu);
+    driving.search(point1, point2);
+    }
+	
+                    //线车路程	
+/*-------------------------------------------*/
+function bus(){	
+    var map = new BMap.Map("mapMap");
+    map.centerAndZoom(new BMap.Point(_jingDu,_weiDu), 12);
+
+    var transit = new BMap.TransitRoute(map, {
+        renderOptions: {map: map, panel: "mapResult"}
+    });
+    map.enableScrollWheelZoom(true);     //开启鼠标滚轮缩放
+    var point1 = new BMap.Point(_jingDu,_weiDu);
+    var point2 = new BMap.Point(yd_jingDu,yd_weiDu);
+    transit.search(point1, point2);
+    }
+        
+                                                                              
+
+   		/*	登录函数*/
+/*-------------------------------------------*/
+function login(){
+	$.mobile.changePage("#index");
+    var un=$("#loginUsername").val();
+    var pw=$("#loginPassword").val();
+    var data = {"username":un,"password":pw};
+    $.getJSON(http+"login.php",data,function(data){
+   // alert("Data: " + data + "\nStatus: " + status);
+   if(data.state=="true")
+   {    
+        $("#index").find("#indexLogin").html("信息");
+        $("#index").find("#indexLogin").attr("href","#leftpanel");        //更改链接地址
+		$("#leftpanel").find("h3").first().html(data.name);
+		if($("#loginRemember").is(":checked"))
+		{
+			localStorage.setItem("user",un);				   //利用localStorage保存用户名密码
+        	localStorage.setItem("pass",pw);
+			}
+		else
+		{
+			localStorage.removeItem("user");
+			localStorage.removeItem("pass");
+			}
+
+       }
+  
+   else if(data.state=="false")
+   alert("失败");
+   else
+   alert("传值有问题");
+  });
+}		
+	//注册函数
+/*-------------------------------------------*/
+function signin()
+{
+
+	var phone=$("#signinPhone").val();
+	var name=$("#signinUsername").val();
+	var pass=$("#signinPassword").val();
+	$.getJSON(http+"signin.php",{"name":name,"pass":pass,"phone":phone},function(data){
+		if(data.a=="a"){
+			$.mobile.changePage(http+"index.html");
+			$("#loginPassword").val(pass); 
+       		$("#loginUsername").val(phone); 
+			login();
+			}
+		else if(data.a=="b"){
+			alert("该手机号码已被注册");
+			}
+		else
+		alert("注册传值错误");
+		});
+	}		
+																	
+    //退出登录函数
+/*-------------------------------------------*/
+function quit()
+{
+    $("#leftpanel" ).panel( "close" );							//关闭侧边栏
+    $("#index").find("#indexLogin").html("登录");
+    $("#index").find("#indexLogin").attr("href","#login");        //更改链接地址
+    localStorage.removeItem("user");							//清除localStorage
+    localStorage.removeItem("pass");	
+    }
+
+	
+    //发送验证码
+/*-------------------------------------------*/
+var InterValObj; //timer变量，控制时间
+var count = 10; //间隔函数，1秒执行
+var curCount;//当前剩余秒数
+var code = ""; //验证码
+var codeLength = 6;//验证码长度
+function sendMessage() {
+    curCount = count;
+    var phone=$("#phone").val();//手机号码
+    if(phone != ""){
+        //产生验证码
+        for (var i = 0; i < codeLength; i++) {
+            code += parseInt(Math.random() * 9).toString();
+        }
+        //设置button效果，开始计时
+        $("#btnSendCode").attr("disabled","ture");//当前按钮不可
+        $("#btnSendCode").html("请在" + curCount + "秒内输入验证码");
+        InterValObj = window.setInterval(SetRemainTime, 1000); //启动计时器，1秒执行一次
+    //向后台发送处理数据
+        $.ajax({
+            type: "POST", //用POST方式传输
+            dataType: "text", //数据格式:JSON
+            url: 'signin.php', //目标地址
+            data: "phone=" + phone + "&code=" + code,
+            error: function (XMLHttpRequest, textStatus, errorThrown) { },
+            success: function (msg){ 
+			
+			}
+        });
+    }else{
+        alert("请输入手机号");
+    }
+}
+
+//timer处理函数
+/*-------------------------------------------*/
+function SetRemainTime() {
+    if (curCount == 0) {                
+        window.clearInterval(InterValObj);//停止计时器
+        $("#btnSendCode").removeAttr("disabled");//启用按钮
+        $("#btnSendCode").html("重新发送验证码");
+        code = ""; //清除验证码。如果不清除，过时间后，输入收到的验证码依然有效    
+    }
+    else {
+        curCount--;
+        $("#btnSendCode").html("请在" + curCount + "秒内输入验证码");
+    }
+}
+
+     //绑定事件
+/*-------------------------------------------*/
+var bindEvent = function(){
+	$("#indexMoreBut").hide();//隐藏加载更多按钮
+    $("#indexSearchBut").on("click",getList);
+    $("#indexDataList").on("click","a",getDetail);//list为动态生成，所以需加入"a"，即a标
+    $("#cityDataList").on("click","a",getCity);
+    $("#loginLoginBut").on("click",login);
+	$("#indexMoreBut").on("click",showList);
+	$("#signinCommitBut").on("click",signin);
+
+    };
+    
+
+    //index页面加载函数
+/*-------------------------------------------*/
+$(document).on("pageinit","#index",function(){
+/*    if (_isbind) return;
+    _isbind = 1;*/
+	searchLocalStorage();											//查看localStorage中数据
+    get_addressInfo();												//获取地址
+    bindEvent();     //绑定事件
+    
+});
+
+$(document).on("pageshow","#login",function(){
+	//$("#loginRemember").attr("checked", true);  
+});		
+$(document).on("pageinit","#signin",function(){
+
+});		
+  //city页面声明函数
+ /*-------------------------------------------*/
+$(document).on("pageinit","#city",function(){
+    
+    if(_iscity) return ;
+    _iscity=1;
+    //alert ("city");
+    $.getJSON(http+"get_City.php",function(city_list){
+        var c_list = $("#cityDataList");
+        var city_arr = [];
+    for(var i in city_list)
+    {
+        if(i==0)
+        {
+            city_arr.push('<div data-role="collapsible">');
+            city_arr.push('<h4>'+city_list[0].sf+'</h4>');
+            city_arr.push('<ul data-role="listview">');
+            city_arr.push('<li><a href="#index" data-transition="slideup" c="'+ city_list[0].csmc +'">'+city_list[0].csmc+'</a></li>');
+            }
+        else
+        {
+            if((city_list[i].sf)==(city_list[i-1].sf))
+            {
+            city_arr.push('<li><a href="#index" data-transition="slideup" c="'+ city_list[i].csmc +'">'+city_list[i].csmc+'</a></li>');
+            }
+            else
+            {
+                city_arr.push('</ul></div><div data-role="collapsible">');
+                city_arr.push('<h4>'+city_list[i].sf+'</h4><ul data-role="listview">');
+                city_arr.push('<li><a href="#index" data-transition="slideup" c="'+ city_list[i].csmc +'">'+city_list[i].csmc+'</a></li>');
+                
+                }
+        }
+    }
+    city_arr.push("</ul></div>");
+    c_list.html(city_arr.join(""));
+    //显示JQM格式
+    $("#cityDataList").collapsibleset("refresh");
+    $("#city ul").listview(); 
+    });
+});
+    
+/*jQuery Mobile 过渡事件
+我们还可以在从一页过渡到下一页时使用事件。
+页面过渡涉及两个页面：一张“来”的页面和一张“去”的页面 - 这些过渡使当前活动页面（“来的”页面）到新页面（“去的”页面的改变过程变得更加动感。
+事件	描述
+pagebeforeshow	在“去的”页面触发，在过渡动画开始前。
+pageshow		在“去的”页面触发，在过渡动画完成后。
+pagebeforehide	在“来的”页面触发，在过渡动画开始前。
+pagehide		在“来的”页面触发，在过渡动画完成后。      */       //跳转到map时触发函数，每次跳转均触发
+/*-------------------------------------------*/
+$(document).on("pageshow","#map",function(){
+walking();
+});
+
+/*初次登录软件，查看localStorage中是否有值*/
+/*-------------------------------------------*/
+function searchLocalStorage(){
+//遍历localStorage
+    var storage = window.localStorage; 
+    var save=0;
+    for (var i=0, len = storage.length; i < len; i++)
+    {
+        
+    var key = storage.key(i); 
+    if(key=="pass"){
+        $("#loginPassword").val(storage.getItem(key)); 
+        save=save+1;
+        }
+    else if(key=="user"){
+        $("#loginUsername").val(storage.getItem(key)); 
+        save=save+1;
+        }
+    else if(key=="city"){
+	_city=storage.getItem(key);
+	//$("#index").find("#indexCity").html(_city);
+	}
+    if(save==2)
+    {
+        login();
+        break;
+        }
+    }
+
+}
+</script> 
+
+</head>
+
+<body>
+
+
+<div data-role="page" id="index" data-transition="fade">                               <!--主界面index-->
+    <div data-role="header" data-position="fixed"><!--标题-->
+        <h1>药品价格查询</h1>
+        
+        <a href="#city" data-theme="b" data-transition="slideup" data-role="button" class="ui-btn-right" id="indexCity">定位中...</a>
+        <a href="#login" data-theme="b" data-rel="popup" data-transition="slideup" data-role="button" class="ui-btn-left" id="indexLogin">登录</a>
+    </div>
+    <div data-role="popup" id="login" data-theme="a" class="ui-corner-all" data-corners="false" data-position-to='window'>     <!-- 显示登录框 -->   
+  <form> 
+    <div style="padding:10px 20px;">           
+      <h3>登录</h3>
+      <form >
+      <label for="loginUsername" class="ui-hidden-accessible">手机号:</label>
+      <input type="text" name="loginUsername" id="loginUsername" value="" placeholder="输入手机号码" data-theme="a" />
+      <label for="loginPassword" class="ui-hidden-accessible">密码:</label>
+      <input type="password" name="loginPassword" id="loginPassword" value="" placeholder="输入密码" data-theme="a" />
+      <input type="checkbox" id="loginRemember" checked="checked" style="vertical-align:middle;"/><label style="vertical-align:middle;">记住账号密码</label>  <a href="#signin">注册</a>  
+      <button type="button" value="submit"  id="loginLoginBut" data-theme="b">登录</button>
+      </form>
+      </div>
+        </form>
+    </div>           
+
+    
+    <div data-role="panel" id="leftpanel" data-position="left" data-display="reveal" data-theme="a">
+    <h4>欢迎你，</h4><h3></h3>
+ 	<button value="" id="leftpanelQuit" onclick="quit()">退出</button>
+    </div>
+
+    <div role="main" class="ui-content"><!--内容-->
+    <div data-role="fieldcontain">
+            <label for="select-native-fc">排序：</label>
+            <select name="select-native-fc" id="select-native-fc">
+                <option value="price">价格</option>
+                <option value="distance">距离</option>
+                <option value="total">综合</option>
+            </select>
+    </div>
+ 	  <div data-role="fieldcontain">
+      <input for="indexSearchBut" type="text" id="indexKeyword" />
+      <button id="indexSearchBut" type="search" data-theme="b">查询</button>
+      </div>
+      <!--<textarea id="mm"></textarea>-->
+      <!--显示查询结果-->
+      <ul data-role="listview" data-inset="true" id="indexDataList">
+      </ul>
+      <a data-role="button" id="indexMoreBut" href="javascript:return false;"  >加载更多...</a>
+        
+    </div>
+    </div><!--界面index-->
+                                                                                        
+<div data-role="page" id="signin" data-transition="fade">                            <!--注册页面signin-->
+    <div data-role="header" data-position="fixed"><h1>注册页面</h1>
+    <a href="#index" data-transition="slideup" data-role="button" class="ui-btn-left">返回</a>
+    </div>
+    <div role="main" class="ui-content">
+  
+   <form>
+   <label for="signinUsername" class="ui-hidden-accessible">用户名:</label>
+       <input type="text" id="signinUsername" name="signinUsername" placeholder="用户名.."/>
+   <label for="signinPhone" class="ui-hidden-accessible">手机号码:</label>
+       <input type="text" id="signinPhone" name="phone" placeholder="您的手机号码.."/>
+   <label class="ui-hidden-accessible">验证码:</label>
+   <div data-role="fieldcontain" >
+       <input type="text" id="signinCheckCode" name="signinCheckCode" size="6"/>
+       <button data-inline="true" id="signinSendCodeBut" onclick="sendMessage()">发送验证码</button>
+   </div>
+   <label for="signinPassword" class="ui-hidden-accessible">密码:</label>
+       <input type="password" id="signinPassword" name="signinPassword" placeholder="密码.."/>
+   <label for="signinPasswordS" class="ui-hidden-accessible">确认密码:</label>
+       <input type="password" id="signinPasswordS" name="signinPasswordS" placeholder="确认密码.."/>
+       <input type="submit" data-inline="true" id="signinCommitBut" value="提交">
+   </form>
+    
+   </div>
+   </div>
+
+</div><!--注册页面signin-->
+                
+
+<div data-role="page" id="detail" data-transition="fade">                               <!--详情界面detail-->
+
+    <div data-role="header" data-position="fixed">
+        <h1>详细页面</h1>    
+    </div>
+
+    <div role="main" class="ui-content">
+   
+        <h2></h2>
+        <div class="ui-grid-a">
+        </div>
+    <!--<table data-role="table" id="movie-table" data-mode="reflow" class="ui-responsive table-stroke">
+        </table>-->
+        <h3>
+        </h3>
+        <a href="#index" data-transition="slideup" class="ui-btn ui-corner-all" data-rel="back">返回</a>
+    </div>
+
+    <div data-role="footer">
+        <div data-role="navbar">
+            <ul>
+                <li><a href="#index" data-icon="grid" class="ui-btn-active">查询</a></li>
+                <li><a href="#" data-icon="star">收藏</a></li>
+                <li><a href="#" data-icon="gear">设置</a></li>
+            </ul>
+        </div>
+    </div>
+</div>  <!--详情界面detail-->
+
+
+
+<div data-role="page" id="map">                                                       <!--地图界面map-->
+    <div data-role="header" data-position="fixed">
+        <h1>地图页面</h1>
+    </div>
+
+    <div role="main" class="ui-content">
+
+    <select onChange="change(this.value)">
+        <option selected="selected" value="walking">步行规划</option>
+        <option value="driving">驾车规划</option>
+        <option value="bus">公交规划</option>
+    </select>
+    <div id="mapMap"></div>
+    <div id="mapResult"></div>
+    <a href="#detail" data-transition="slideup" class="ui-btn ui-corner-all" data-rel="back">返回</a>
+    </div>
+
+    <div data-role="footer">
+       
+    </div>
+</div>   <!--地图界面map-->
+
+
+
+<div data-role="page" id="city" >                                                   <!--城市列表界面city-->
+    <div data-role="header" data-position="fixed">
+        <h1>选择城市</h1>
+    </div>
+
+    <div data-role="content">
+    <div id="cityDataList" data-role="collapsible-set"></div> 
+    <a href="#index" data-transition="slideup" class="ui-btn ui-corner-all" data-rel="back">返回</a>
+    </div>
+    <div data-role="footer"></div>
+</div><!--城市列表界面city-->
+
+<script>
+$("#select-native-fc").change(function(){
+    //alert("change方法");
+    //获取text
+    var sequence=$("#select-native-fc").find("option:selected").text(); 
+    if(sequence=='价格')
+    _sequence=1;
+    else if(sequence=='距离')
+    _sequence=2;
+    else
+    _sequence=3;
+  if(document.getElementById("indexKeyword").value!="")
+    getList();                //重新获取查询结果
+    });	
+
+</script>
+
+
+</body>
+</html>
